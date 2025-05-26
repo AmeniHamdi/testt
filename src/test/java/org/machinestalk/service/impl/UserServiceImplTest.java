@@ -12,8 +12,10 @@ import org.machinestalk.service.UserService;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.modelmapper.ModelMapper;
 import reactor.test.StepVerifier;
 
+import java.util.Collections;
 import java.util.Optional;
 
 import static java.util.Collections.singleton;
@@ -25,8 +27,9 @@ import static org.mockito.MockitoAnnotations.openMocks;
 class UserServiceImplTest {
 
   @Mock private UserRepository userRepository;
+  @Mock private ModelMapper modelMapper;
 
-  @InjectMocks private UserService userService;
+  @InjectMocks private UserServiceImpl userService;
 
   @BeforeEach
   void setUp() {
@@ -36,45 +39,59 @@ class UserServiceImplTest {
   @Test
   void Should_RegisterNewUser_When_RegisterUser() {
     // Given
-    final AddressDto addressDto = new AddressDto();
-    addressDto.setStreetName("20");
+    AddressDto addressDto = new AddressDto();
+    addressDto.setStreetNumber("20");
     addressDto.setStreetName("Rue de Voltaire");
     addressDto.setPostalCode("75015");
     addressDto.setCity("Paris");
     addressDto.setCountry("France");
 
-    final UserRegistrationDto userRegistrationDto = new UserRegistrationDto();
+    UserRegistrationDto userRegistrationDto = new UserRegistrationDto();
     userRegistrationDto.setFirstName("Jack");
     userRegistrationDto.setLastName("Sparrow");
     userRegistrationDto.setDepartment("RH");
     userRegistrationDto.setPrincipalAddress(addressDto);
 
-    final Department department = new Department();
-    department.setName(userRegistrationDto.getDepartment());
-    final Address address = new Address();
-    address.setStreetNumber(userRegistrationDto.getPrincipalAddress().getStreetNumber());
-    address.setStreetName(userRegistrationDto.getPrincipalAddress().getStreetName());
-    address.setPostalCode(userRegistrationDto.getPrincipalAddress().getPostalCode());
-    address.setCity(userRegistrationDto.getPrincipalAddress().getCity());
-    address.setCountry(userRegistrationDto.getPrincipalAddress().getCountry());
-    final User user = new User();
-    user.setFirstName(userRegistrationDto.getFirstName());
-    user.setLastName(userRegistrationDto.getLastName());
-    user.setDepartment(department);
-    user.setAddresses(singleton(address));
+    Department department = new Department();
+    department.setName("RH");
 
-    when(userRepository.save(Mockito.any(User.class))).thenReturn(user);
+    Address address = new Address();
+    address.setStreetNumber("20");
+    address.setStreetName("Rue de Voltaire");
+    address.setPostalCode("75015");
+    address.setCity("Paris");
+    address.setCountry("France");
 
-    // When
-    final User result = userService.registerUser(userRegistrationDto);
+    User mappedUser = new User();
+    mappedUser.setFirstName("Jack");
+    mappedUser.setLastName("Sparrow");
+    mappedUser.setDepartment(department);
+    mappedUser.setAddresses(Collections.singleton(address));
 
-    // Then
+    User savedUser = new User();
+    savedUser.setId(1L); // simulate DB assigning ID
+    savedUser.setFirstName("Jack");
+    savedUser.setLastName("Sparrow");
+    savedUser.setDepartment(department);
+    savedUser.setAddresses(Collections.singleton(address));
+
+    when(modelMapper.map(userRegistrationDto, User.class)).thenReturn(mappedUser);
+
+    when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+    User result = userService.registerUser(userRegistrationDto);
+
     assertNotNull(result);
-    verify(userRepository, times(1)).save(any(User.class));
     assertNotNull(result.getId());
-    user.setId(result.getId());
-    assertEquals(user, result);
+    assertEquals(1L, result.getId());
+    assertEquals("Jack", result.getFirstName());
+    assertEquals("Sparrow", result.getLastName());
+    assertEquals("RH", result.getDepartment().getName());
+    assertEquals("Rue de Voltaire", result.getAddresses().iterator().next().getStreetName());
+
+    verify(userRepository, times(1)).save(any(User.class));
   }
+
 
   @Test
   void Should_RetrieveUserByTheGivenId_When_GetById() {
